@@ -116,6 +116,15 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
+        
+        /* 新增：次要日期資訊區塊 (星期與農曆) */
+        #subDateDisplay {
+            font-size: clamp(16px, 4vw, 22px);
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
 
         /* 時鐘與馬表區塊 */
         #clock, #stopwatch {
@@ -198,6 +207,8 @@
             <button id="toggleTimeBtn" class="toggle-btn">切換網路時間</button>
         </div>
         <div id="dateDisplay">載入中...</div>
+        <!-- 這是新的副標題區塊 -->
+        <div id="subDateDisplay">--</div>
         <div id="clock">--:--:--</div>
     </div>
 
@@ -239,7 +250,7 @@
 
 
         /* ==========================================
-           2. 取得時間與星期邏輯
+           2. 取得時間、星期與原生農曆邏輯
            ========================================== */
         let useNetworkTime = false; 
         let networkTimeOffset = 0;  
@@ -247,6 +258,7 @@
         const timeStatus = document.getElementById('timeStatus');
         const toggleTimeBtn = document.getElementById('toggleTimeBtn');
         const dateDisplay = document.getElementById('dateDisplay');
+        const subDateDisplay = document.getElementById('subDateDisplay');
         const clockDisplay = document.getElementById('clock');
 
         async function fetchNetworkTime() {
@@ -268,7 +280,7 @@
                 
             } catch (error) {
                 console.error("無法取得網路時間", error);
-                alert("無法連線至 WorldTimeAPI，將繼續使用設備時間。");
+                alert("無法連線至網路時間，將繼續使用設備時間。");
                 useNetworkTime = false;
                 timeStatus.innerHTML = "📱 設備時間";
                 toggleTimeBtn.textContent = "切換網路時間";
@@ -289,21 +301,55 @@
         // 定義星期轉換陣列
         const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
+        // 將設備日期轉換為傳統農民曆 (完全離線運作)
+        function getLunarDateString(date) {
+            try {
+                // 呼叫瀏覽器內建的農曆格式
+                const dateString = new Intl.DateTimeFormat('zh-TW-u-ca-chinese', { month: 'numeric', day: 'numeric' }).format(date);
+                // 擷取字串中的數字
+                const nums = dateString.match(/\d+/g);
+                
+                if (nums && nums.length >= 2) {
+                    const m = parseInt(nums[0]);
+                    const d = parseInt(nums[1]);
+                    
+                    // 中文對照表
+                    const lunarMonths = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+                    const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                                       '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                                       '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+                    
+                    const mStr = lunarMonths[m - 1] ? lunarMonths[m - 1] + "月" : m + "月";
+                    const dStr = lunarDays[d - 1] ? lunarDays[d - 1] : d + "日";
+                    
+                    // 判斷是否為閏月
+                    const isLeap = dateString.includes('閏') || dateString.includes('leap');
+                    
+                    return `農曆 ${isLeap ? "閏" : ""}${mStr}${dStr}`;
+                }
+                return "";
+            } catch (error) {
+                return ""; // 萬一舊版手機不支援此 API，則靜默回傳空白，不影響主程式
+            }
+        }
+
         function updateClockDisplay() {
             const currentTime = useNetworkTime ? new Date(Date.now() + networkTimeOffset) : new Date();
             
-            // 處理日期格式 YYYY/MM/DD
+            // 處理主日期 
             const dateString = currentTime.toLocaleDateString('zh-TW', { 
                 year: 'numeric', month: '2-digit', day: '2-digit'
             });
-            
-            // 取得目前的星期數字並轉換為文字
-            const dayOfWeek = weekdays[currentTime.getDay()];
-            
-            // 將日期與星期合併顯示
-            dateDisplay.textContent = `${dateString} (${dayOfWeek})`;
+            dateDisplay.textContent = dateString;
 
-            // 處理時間格式 HH:MM:SS
+            // 處理星期與農曆
+            const dayOfWeek = weekdays[currentTime.getDay()];
+            const lunarStr = getLunarDateString(currentTime);
+            
+            // 顯示在下排區塊，並使用 ｜ 分隔
+            subDateDisplay.textContent = `${dayOfWeek} ${lunarStr ? '｜ ' + lunarStr : ''}`;
+
+            // 處理主時鐘 
             const timeString = currentTime.toLocaleTimeString('zh-TW', { 
                 hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
             });
