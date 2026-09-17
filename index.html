@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>精準時間與馬表 APP</title>
+    <title>時間與馬表 APP</title>
     <style>
         /* ==========================================
            CSS 變數宣告區 (預設深色模式)
@@ -109,6 +109,7 @@
             cursor: pointer;
         }
         .toggle-btn:hover { background-color: #9b59b6; }
+        .toggle-btn:disabled { opacity: 0.6; cursor: wait; }
 
         /* 日期顯示區塊 */
         #dateDisplay {
@@ -261,30 +262,77 @@
         const subDateDisplay = document.getElementById('subDateDisplay');
         const clockDisplay = document.getElementById('clock');
 
-        async function fetchNetworkTime() {
-            toggleTimeBtn.textContent = "連線中...";
-            try {
-                const response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Taipei');
-                if (!response.ok) throw new Error('API 連線失敗');
-                
-                const data = await response.json();
-                const networkDate = new Date(data.datetime);
-                const localDate = new Date();
-                
-                networkTimeOffset = networkDate.getTime() - localDate.getTime();
-                useNetworkTime = true;
-                
-                timeStatus.innerHTML = "🌐 網路標準時間";
-                toggleTimeBtn.textContent = "切換設備時間";
-                updateClockDisplay();
-                
-            } catch (error) {
-                console.error("無法取得網路時間", error);
-                alert("無法連線至網路時間，將繼續使用設備時間。");
-                useNetworkTime = false;
-                timeStatus.innerHTML = "📱 設備時間";
-                toggleTimeBtn.textContent = "切換網路時間";
+        /* ------------------------------------------
+           2a. 帶逾時控制的 fetch（避免因無回應而卡住）
+           ------------------------------------------ */
+        function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            return fetch(url, { ...options, signal: controller.signal })
+                .finally(() => clearTimeout(timer));
+        }
+
+        /*
+           2b. 多來源網路時間清單（依序嘗試，第一個成功即採用）
+           - worldtimeapi.org 經常出現連線逾時或維護中斷，故不再作為唯一來源。
+           - 這裡改用 UTC 時間做基準，再自行換算，避免因伺服器回傳字串
+             不含時區位移資訊而算錯。
+        */
+        const timeProviders = [
+            {
+                name: 'timeapi.io',
+                url: 'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
+                parse: async (res) => {
+                    const data = await res.json();
+                    // dateTime 例如 "2026-09-17T05:32:10.1234567"（無時區資訊，代表 UTC）
+                    return new Date(data.dateTime + 'Z');
+                }
+            },
+            {
+                name: 'worldtimeapi.org',
+                url: 'https://worldtimeapi.org/api/timezone/Etc/UTC',
+                parse: async (res) => {
+                    const data = await res.json();
+                    // utc_datetime 例如 "2026-09-17T05:32:10.123456+00:00"
+                    return new Date(data.utc_datetime);
+                }
             }
+        ];
+
+        async function fetchNetworkTime() {
+            toggleTimeBtn.disabled = true;
+            toggleTimeBtn.textContent = "連線中...";
+
+            for (const provider of timeProviders) {
+                try {
+                    const response = await fetchWithTimeout(provider.url, {}, 6000);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const networkDate = await provider.parse(response);
+                    if (isNaN(networkDate.getTime())) throw new Error('時間格式解析失敗');
+
+                    const localDate = new Date();
+                    networkTimeOffset = networkDate.getTime() - localDate.getTime();
+                    useNetworkTime = true;
+
+                    timeStatus.innerHTML = `🌐 網路標準時間`;
+                    toggleTimeBtn.textContent = "切換設備時間";
+                    toggleTimeBtn.disabled = false;
+                    updateClockDisplay();
+                    return; // 成功取得時間，結束流程
+                } catch (error) {
+                    console.warn(`⚠️ 時間來源「${provider.name}」連線失敗，嘗試下一個來源...`, error);
+                    // 繼續嘗試清單中的下一個來源
+                }
+            }
+
+            // 所有來源皆失敗
+            console.error("所有網路時間來源皆無法連線");
+            useNetworkTime = false;
+            timeStatus.innerHTML = "📱 設備時間";
+            toggleTimeBtn.textContent = "切換網路時間";
+            toggleTimeBtn.disabled = false;
+            alert("目前所有網路時間來源皆無法連線，已改用設備時間，請稍後再試。");
         }
 
         toggleTimeBtn.addEventListener('click', () => {
