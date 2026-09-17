@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>精準時間與馬表 APP</title>
+    <style>
+        /* ==========================================
+           CSS 變數宣告區 (預設深色模式)
+           ========================================== */
+        :root {
+            --bg-color: #2c3e50;         
+            --container-bg: #34495e;     
+            --text-main: #ecf0f1;        
+            --text-muted: #bdc3c7;       
+            --clock-color: #f1c40f;      
+            --border-color: #7f8c8d;     
+            --lap-bg: #2c3e50;           
+            --theme-btn-bg: #f39c12;     
+            --theme-btn-hover: #e67e22;  
+        }
+
+        /* 淺色模式變數 */
+        body.light-theme {
+            --bg-color: #f4f7f6;
+            --container-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-muted: #7f8c8d;
+            --clock-color: #2980b9;      
+            --border-color: #ecf0f1;
+            --lap-bg: #f9f9f9;
+            --theme-btn-bg: #34495e;
+            --theme-btn-hover: #2c3e50;
+        }
+
+        /* --- 版面與排版樣式 --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            transition: background-color 0.3s ease, color 0.3s ease; 
+            margin: 0;
+            padding: 2vw;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: var(--container-bg);
+            transition: background-color 0.3s ease;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.15); 
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .top-controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .theme-toggle-btn {
+            background-color: var(--theme-btn-bg);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: clamp(12px, 3vw, 14px);
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .theme-toggle-btn:hover { background-color: var(--theme-btn-hover); }
+
+        .header-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        h2 {
+            font-size: clamp(18px, 4vw, 24px);
+            margin: 0;
+            color: var(--text-muted);
+        }
+
+        .toggle-btn {
+            background-color: #8e44ad;
+            padding: 8px 12px;
+            font-size: clamp(12px, 2.5vw, 16px);
+            min-height: auto;
+            flex: 0 1 auto;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+        }
+        .toggle-btn:hover { background-color: #9b59b6; }
+        .toggle-btn:disabled { opacity: 0.6; cursor: wait; }
+
+        /* 日期顯示區塊 */
+        #dateDisplay {
+            font-size: clamp(24px, 6vw, 40px);
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        /* 新增：次要日期資訊區塊 (星期與農曆) */
+        #subDateDisplay {
+            font-size: clamp(16px, 4vw, 22px);
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* 時鐘與馬表區塊 */
+        #clock, #stopwatch {
+            font-size: clamp(40px, 12vw, 85px); 
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 10px 0;
+            color: var(--clock-color); 
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        #stopwatch { margin: 20px 0; }
+        
+        .ms {
+            font-size: 0.7em; 
+            color: var(--text-muted);
+        }
+
+        /* 按鈕與列表區塊 */
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1 1 80px;
+            padding: 15px 10px;
+            border: none;
+            border-radius: 8px;
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            font-size: clamp(16px, 3vw, 20px);
+            font-weight: bold;
+            transition: background 0.2s;
+            min-height: 50px;
+        }
+
+        button:hover { background-color: #2980b9; }
+        #startBtn { background-color: #2ecc71; }
+        #startBtn:hover { background-color: #27ae60; }
+        #resetBtn { background-color: #e74c3c; }
+        #resetBtn:hover { background-color: #c0392b; }
+        
+        #laps {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+            max-height: 40vh;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        #laps li {
+            background: var(--lap-bg);
+            margin: 5px 0;
+            padding: 15px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            border-left: 5px solid #3498db;
+            font-size: clamp(16px, 3vw, 22px);
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 頂部獨立區塊：主題切換按鈕 -->
+    <div class="top-controls">
+        <button id="themeToggleBtn" class="theme-toggle-btn">☀️ 切換淺色模式</button>
+    </div>
+
+    <!-- 區塊一：日期與時間顯示 -->
+    <div class="container">
+        <div class="header-area">
+            <h2 id="timeStatus">📱 設備時間</h2>
+            <button id="toggleTimeBtn" class="toggle-btn">切換網路時間</button>
+        </div>
+        <div id="dateDisplay">載入中...</div>
+        <!-- 這是新的副標題區塊 -->
+        <div id="subDateDisplay">--</div>
+        <div id="clock">--:--:--</div>
+    </div>
+
+    <!-- 區塊二：馬表與計圈紀錄 -->
+    <div class="container">
+        <h2>⏱️ 馬表計時器</h2>
+        <div id="stopwatch">00:00:00.<span class="ms">000</span></div>
+        <div class="btn-group">
+            <button id="startBtn">開始</button>
+            <button id="pauseBtn">暫停</button>
+            <button id="lapBtn">計圈</button>
+            <button id="resetBtn">重設</button>
+        </div>
+        <ul id="laps"></ul>
+    </div>
+
+    <script>
+        /* ==========================================
+           1. 深/淺色主題切換邏輯
+           ========================================== */
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const body = document.body;
+
+        if (localStorage.getItem('appTheme') === 'light') {
+            body.classList.add('light-theme');
+            themeToggleBtn.textContent = "🌙 切換深色模式";
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            body.classList.toggle('light-theme');
+            if (body.classList.contains('light-theme')) {
+                themeToggleBtn.textContent = "🌙 切換深色模式";
+                localStorage.setItem('appTheme', 'light');
+            } else {
+                themeToggleBtn.textContent = "☀️ 切換淺色模式";
+                localStorage.setItem('appTheme', 'dark');
+            }
+        });
+
+
+        /* ==========================================
+           2. 取得時間、星期與原生農曆邏輯
+           ========================================== */
+        let useNetworkTime = false; 
+        let networkTimeOffset = 0;  
+
+        const timeStatus = document.getElementById('timeStatus');
+        const toggleTimeBtn = document.getElementById('toggleTimeBtn');
+        const dateDisplay = document.getElementById('dateDisplay');
+        const subDateDisplay = document.getElementById('subDateDisplay');
+        const clockDisplay = document.getElementById('clock');
+
+        /* ------------------------------------------
+           2a. 帶逾時控制的 fetch（避免因無回應而卡住）
+           ------------------------------------------ */
+        function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            return fetch(url, { ...options, signal: controller.signal })
+                .finally(() => clearTimeout(timer));
+        }
+
+        /*
+           2b. 多來源網路時間清單（依序嘗試，第一個成功即採用）
+           - worldtimeapi.org 經常出現連線逾時或維護中斷，故不再作為唯一來源。
+           - 這裡改用 UTC 時間做基準，再自行換算，避免因伺服器回傳字串
+             不含時區位移資訊而算錯。
+        */
+        const timeProviders = [
+            {
+                name: 'timeapi.io',
+                url: 'https://timeapi.io/api/Time/current/zone?timeZone=UTC',
+                parse: async (res) => {
+                    const data = await res.json();
+                    // dateTime 例如 "2026-09-17T05:32:10.1234567"（無時區資訊，代表 UTC）
+                    return new Date(data.dateTime + 'Z');
+                }
+            },
+            {
+                name: 'worldtimeapi.org',
+                url: 'https://worldtimeapi.org/api/timezone/Etc/UTC',
+                parse: async (res) => {
+                    const data = await res.json();
+                    // utc_datetime 例如 "2026-09-17T05:32:10.123456+00:00"
+                    return new Date(data.utc_datetime);
+                }
+            }
+        ];
+
+        async function fetchNetworkTime() {
+            toggleTimeBtn.disabled = true;
+            toggleTimeBtn.textContent = "連線中...";
+
+            for (const provider of timeProviders) {
+                try {
+                    const response = await fetchWithTimeout(provider.url, {}, 6000);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const networkDate = await provider.parse(response);
+                    if (isNaN(networkDate.getTime())) throw new Error('時間格式解析失敗');
+
+                    const localDate = new Date();
+                    networkTimeOffset = networkDate.getTime() - localDate.getTime();
+                    useNetworkTime = true;
+
+                    timeStatus.innerHTML = `🌐 網路標準時間`;
+                    toggleTimeBtn.textContent = "切換設備時間";
+                    toggleTimeBtn.disabled = false;
+                    updateClockDisplay();
+                    return; // 成功取得時間，結束流程
+                } catch (error) {
+                    console.warn(`⚠️ 時間來源「${provider.name}」連線失敗，嘗試下一個來源...`, error);
+                    // 繼續嘗試清單中的下一個來源
+                }
+            }
+
+            // 所有來源皆失敗
+            console.error("所有網路時間來源皆無法連線");
+            useNetworkTime = false;
+            timeStatus.innerHTML = "📱 設備時間";
+            toggleTimeBtn.textContent = "切換網路時間";
+            toggleTimeBtn.disabled = false;
+            alert("目前所有網路時間來源皆無法連線，已改用設備時間，請稍後再試。");
+        }
+
+        toggleTimeBtn.addEventListener('click', () => {
+            if (useNetworkTime) {
+                useNetworkTime = false;
+                timeStatus.innerHTML = "📱 設備時間";
+                toggleTimeBtn.textContent = "切換網路時間";
+                updateClockDisplay();
+            } else {
+                fetchNetworkTime();
+            }
+        });
+
+        // 定義星期轉換陣列
+        const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+
+        // 將設備日期轉換為傳統農民曆 (完全離線運作)
+        function getLunarDateString(date) {
+            try {
+                // 呼叫瀏覽器內建的農曆格式
+                const dateString = new Intl.DateTimeFormat('zh-TW-u-ca-chinese', { month: 'numeric', day: 'numeric' }).format(date);
+                // 擷取字串中的數字
+                const nums = dateString.match(/\d+/g);
+                
+                if (nums && nums.length >= 2) {
+                    const m = parseInt(nums[0]);
+                    const d = parseInt(nums[1]);
+                    
+                    // 中文對照表
+                    const lunarMonths = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+                    const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                                       '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                                       '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+                    
+                    const mStr = lunarMonths[m - 1] ? lunarMonths[m - 1] + "月" : m + "月";
+                    const dStr = lunarDays[d - 1] ? lunarDays[d - 1] : d + "日";
+                    
+                    // 判斷是否為閏月
+                    const isLeap = dateString.includes('閏') || dateString.includes('leap');
+                    
+                    return `農曆 ${isLeap ? "閏" : ""}${mStr}${dStr}`;
+                }
+                return "";
+            } catch (error) {
+                return ""; // 萬一舊版手機不支援此 API，則靜默回傳空白，不影響主程式
+            }
+        }
+
+        function updateClockDisplay() {
+            const currentTime = useNetworkTime ? new Date(Date.now() + networkTimeOffset) : new Date();
+            
+            // 處理主日期 
+            const dateString = currentTime.toLocaleDateString('zh-TW', { 
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            });
+            dateDisplay.textContent = dateString;
+
+            // 處理星期與農曆
+            const dayOfWeek = weekdays[currentTime.getDay()];
+            const lunarStr = getLunarDateString(currentTime);
+            
+            // 顯示在下排區塊，並使用 ｜ 分隔
+            subDateDisplay.textContent = `${dayOfWeek} ${lunarStr ? '｜ ' + lunarStr : ''}`;
+
+            // 處理主時鐘 
+            const timeString = currentTime.toLocaleTimeString('zh-TW', { 
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            });
+            clockDisplay.textContent = timeString;
+        }
+
+        setInterval(updateClockDisplay, 100);
+        updateClockDisplay(); 
+
+        /* ==========================================
+           3. 馬表計時器邏輯 
+           ========================================== */
+        let startTime = 0;      
+        let elapsedTime = 0;    
+        let timerInterval;      
+        let isRunning = false;  
+        let lapCount = 1;       
+
+        const stopwatchDisplay = document.getElementById('stopwatch');
+        const lapsList = document.getElementById('laps');
+
+        function formatStopwatchTime(time) {
+            const date = new Date(time);
+            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+            const milliseconds = String(date.getUTCMilliseconds()).padStart(3, '0');
+            return `${minutes}:${seconds}.<span class="ms">${milliseconds}</span>`;
+        }
+
+        function updateStopwatch() {
+            const currentTime = Date.now();
+            const timeToDisplay = elapsedTime + (currentTime - startTime);
+            stopwatchDisplay.innerHTML = formatStopwatchTime(timeToDisplay);
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                startTime = Date.now();
+                timerInterval = setInterval(updateStopwatch, 10);
+                isRunning = true;
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                elapsedTime += Date.now() - startTime;
+                isRunning = false;
+            }
+        });
+
+        document.getElementById('lapBtn').addEventListener('click', () => {
+            if (isRunning) {
+                const currentTotalTime = elapsedTime + (Date.now() - startTime);
+                const li = document.createElement('li');
+                li.innerHTML = `<span>第 ${lapCount} 圈</span> <span>${formatStopwatchTime(currentTotalTime)}</span>`;
+                lapsList.prepend(li);
+                lapCount++;
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            clearInterval(timerInterval);
+            isRunning = false;
+            elapsedTime = 0;
+            lapCount = 1;
+            stopwatchDisplay.innerHTML = `00:00:00.<span class="ms">000</span>`;
+            lapsList.innerHTML = ""; 
+        });
+    </script>
+</body>
+</html>
